@@ -6,7 +6,6 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
 import { User } from "@shared/schema";
-import MemoryStore from "memorystore";
 
 const scryptAsync = promisify(scrypt);
 
@@ -24,8 +23,6 @@ async function comparePasswords(supplied: string, stored: string) {
 }
 
 export function setupAuth(app: Express) {
-  const MemorySessionStore = MemoryStore(session);
-  
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || "shopping-assistant-secret",
     resave: false,
@@ -34,9 +31,7 @@ export function setupAuth(app: Express) {
       secure: process.env.NODE_ENV === "production",
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
     },
-    store: new MemorySessionStore({
-      checkPeriod: 86400000 // prune expired entries every 24h
-    })
+    store: storage.sessionStore
   };
 
   app.use(session(sessionSettings));
