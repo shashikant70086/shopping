@@ -22,9 +22,10 @@ import { Separator } from "@/components/ui/separator";
 import { Loader2, ShoppingCart } from "lucide-react";
 import { motion } from "framer-motion";
 import { useTheme } from "@/hooks/use-theme";
+import "@/components/stars.css";
 
-// Custom CSS for stars background
-const starsStyle = `
+// Custom CSS for any additional styles
+const additionalStyles = `
   .stars {
     position: absolute;
     top: 0;
@@ -110,7 +111,7 @@ export default function AuthPage() {
 
   return (
     <>
-      <style>{starsStyle}</style>
+      <style>{additionalStyles}</style>
       <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-gradient-to-br from-[#0f2027] via-[#203a43] to-[#2c5364] p-6">
         <div className={theme === 'dark' ? 'stars' : ''}></div>
         <div className={theme === 'dark' ? 'twinkling' : ''}></div>
