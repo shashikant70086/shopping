@@ -6,12 +6,7 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
 import { User } from "@shared/schema";
-
-declare global {
-  namespace Express {
-    interface User extends User {}
-  }
-}
+import MemoryStore from "memorystore";
 
 const scryptAsync = promisify(scrypt);
 
@@ -29,6 +24,8 @@ async function comparePasswords(supplied: string, stored: string) {
 }
 
 export function setupAuth(app: Express) {
+  const MemorySessionStore = MemoryStore(session);
+  
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || "shopping-assistant-secret",
     resave: false,
@@ -37,6 +34,9 @@ export function setupAuth(app: Express) {
       secure: process.env.NODE_ENV === "production",
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
     },
+    store: new MemorySessionStore({
+      checkPeriod: 86400000 // prune expired entries every 24h
+    })
   };
 
   app.use(session(sessionSettings));
@@ -56,13 +56,13 @@ export function setupAuth(app: Express) {
         }
         return done(null, user);
       } catch (err) {
-        return done(err);
+        return done(err as Error);
       }
     }),
   );
 
   passport.serializeUser((user, done) => {
-    done(null, user.id);
+    done(null, (user as User).id);
   });
 
   passport.deserializeUser(async (id: number, done) => {
@@ -70,7 +70,7 @@ export function setupAuth(app: Express) {
       const user = await storage.getUser(id);
       done(null, user);
     } catch (err) {
-      done(err);
+      done(err as Error);
     }
   });
 
@@ -94,8 +94,8 @@ export function setupAuth(app: Express) {
       req.login(user, (err) => {
         if (err) return next(err);
         // Return user without password
-        const { password, ...userWithoutPassword } = user;
-        return res.status(201).json(userWithoutPassword);
+        const safeUser = { id: user.id, username: user.username };
+        return res.status(201).json(safeUser);
       });
     } catch (err) {
       next(err);
@@ -103,7 +103,7 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", (req, res, next) => {
-    passport.authenticate("local", (err, user, info) => {
+    passport.authenticate("local", (err: Error | null, user: User | false, info: { message: string } | undefined) => {
       if (err) return next(err);
       if (!user) {
         return res.status(401).json({ message: "Invalid credentials" });
@@ -111,8 +111,8 @@ export function setupAuth(app: Express) {
       req.login(user, (err) => {
         if (err) return next(err);
         // Return user without password
-        const { password, ...userWithoutPassword } = user;
-        return res.json(userWithoutPassword);
+        const safeUser = { id: user.id, username: user.username };
+        return res.json(safeUser);
       });
     })(req, res, next);
   });
@@ -131,7 +131,8 @@ export function setupAuth(app: Express) {
       return res.status(401).json({ message: "Unauthorized" });
     }
     // Return user without password
-    const { password, ...userWithoutPassword } = req.user as User;
-    res.json(userWithoutPassword);
+    const user = req.user as User;
+    const safeUser = { id: user.id, username: user.username };
+    res.json(safeUser);
   });
 }
